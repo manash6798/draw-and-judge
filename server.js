@@ -21,7 +21,22 @@ const DEFAULT_ROUNDS = [
   { prompt: "Draw a Valorant agent from memory 🧠", duration: 60 }
 ];
 
-const avatarSet = ["🎨","🦊","🐸","🐼","🐱","🐙","🦄","👽","🤖","🍀","🌙","⭐","🍉","🍩","🧃","🦋","🐨","🐯","🐵","🍓","🌈","⚡","🔥","❄️","🌸","🪐","🎧","🕹️","👾"];
+const avatarSet = ["🎨","🦊","🐸","🐼","🐱","🐙","🦄","👽","🤖","🍀","🌙","⭐","🍉","🍩","🧃","🦋","🐨","🐯","🐵","🍓","🌈","⚡","🔥","❄️","🌸","🪐","🎧","🕹️","👾","🥷"];
+
+const WORDS = [
+  "cat","dog","dragon","pizza","rocket","wizard","ghost","banana","robot","penguin",
+  "castle","volcano","spaceship","unicorn","pirate","ninja","tornado","mermaid","dinosaur","treasure",
+  "coffee","headphones","controller","sunglasses","hamburger","ice cream","trophy","guitar","camera","crown",
+  "football","basketball","sword","shield","monster","alien","superhero","forest","island","campfire",
+  "rainbow","sunset","snowman","octopus","butterfly","shark","elephant","monkey","parrot","koala",
+  "school","library","bedroom","birthday","party","roller coaster","train","airplane","bicycle","motorcycle",
+  "Valorant agent","game controller","Discord logo","internet meme","angry potato","sleepy cat","flying toaster","tiny house","giant donut","magic wand"
+];
+function randomWords(count=3){
+  const pool=[...WORDS], out=[];
+  while(out.length<count && pool.length){ out.push(pool.splice(Math.floor(Math.random()*pool.length),1)[0]); }
+  return out;
+}
 
 function makeCode() {
   let c;
@@ -55,7 +70,8 @@ function roomJSON(room) {
     })),
     drawings: room.drawings,
     submitted: Object.keys(room.drawings),
-    votes: room.votes
+    votes: room.votes,
+    awardTotals: room.awardTotals
   };
 }
 
@@ -73,6 +89,8 @@ function startRound(room, index) {
   room.status = "drawing";
   room.drawings = {};
   room.votes = { best: {}, worst: {}, funniest: {} };
+  room.playerWords = new Map();
+  for (const u of room.users.values()) { if (u.connected) room.playerWords.set(u.id, randomWords(3)); }
   room.endsAt = Date.now() + room.rounds[index].duration * 1000;
 }
 
@@ -104,7 +122,9 @@ io.on("connection", socket => {
       chat: [],
       usedAvatars: new Set(),
       bannedNames: new Set(),
-      challenges: new Map()
+      challenges: new Map(),
+    awardTotals: { best:{}, worst:{}, funniest:{} },
+    playerWords: new Map()
     };
 
     const user = {
@@ -184,6 +204,27 @@ io.on("connection", socket => {
 
     startRound(room, next);
     emitRoom(room);
+    for (const u of room.users.values()) {
+      if (u.connected) io.to(u.id).emit("words:options", { options: room.playerWords.get(u.id) || randomWords(3) });
+    }
+  });
+
+  socket.on("words:get", () => {
+    const room = rooms.get(socket.data.room);
+    if (!room || room.status !== "drawing") return;
+    const options = room.playerWords.get(socket.id) || randomWords(3);
+    room.playerWords.set(socket.id, options);
+    socket.emit("words:options", { options });
+  });
+
+  socket.on("word:choose", ({ word }) => {
+    const room = rooms.get(socket.data.room);
+    if (!room || room.status !== "drawing") return;
+    const options = room.playerWords.get(socket.id) || [];
+    word = String(word || "").trim();
+    if (!options.includes(word)) return;
+    socket.data.chosenWord = word;
+    socket.emit("word:chosen", { word });
   });
 
   socket.on("host:setChallenge", ({ targetId, text }) => {
@@ -235,7 +276,14 @@ io.on("connection", socket => {
     if (!["best","worst","funniest"].includes(category)) return;
     if (!room.users.has(targetId) || targetId === socket.id) return;
 
+    const previous = room.votes[category][socket.id];
+    if (previous === targetId) return;
+    if (previous) {
+      room.awardTotals[category][previous] = Math.max(0, (room.awardTotals[category][previous] || 0) - 1);
+    }
     room.votes[category][socket.id] = targetId;
+    room.awardTotals[category][targetId] = (room.awardTotals[category][targetId] || 0) + 1;
+    socket.emit("vote:accepted", { category, targetId });
     emitRoom(room);
   });
 
