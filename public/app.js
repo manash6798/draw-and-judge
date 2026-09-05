@@ -137,7 +137,23 @@ document.querySelectorAll('.tool[data-tool]').forEach(b=>b.onclick=()=>{document
 document.querySelectorAll('.swatch').forEach(b=>b.onclick=()=>{document.querySelectorAll('.swatch').forEach(x=>x.classList.remove('active'));b.classList.add('active');color=b.dataset.color});
 function clearCanvas(emit=true,record=true){ctx.clearRect(0,0,canvas.clientWidth,canvas.clientHeight);$('submittedBadge').classList.add('hidden');if(emit&&isDrawer()){socket.emit('draw:clear');if(record)recordDrawGroup([{type:'clear'}])}}
 $('clearCanvas').onclick=()=>{if(confirm('Clear your drawing?'))clearCanvas()};$('undoDrawing').onclick=undoDraw;$('redoDrawing').onclick=redoDraw;
-function submitDrawing(){if(!room||room.drawerId!==socket.id||lastSubmittedRound===room.roundIndex)return;flushStrokes();lastSubmittedRound=room.roundIndex;socket.emit('drawing:submit',{image:canvas.toDataURL('image/jpeg',.72)});$('submittedBadge').classList.remove('hidden')}
+function submitDrawing(){
+  if(!room||room.drawerId!==socket.id||lastSubmittedRound===room.roundIndex)return;
+  flushStrokes();
+  const round=room.roundIndex;
+  const image=canvas.toDataURL('image/jpeg',.72);
+  socket.timeout(5000).emit('drawing:submit',{image},(err,res)=>{
+    if(err||res?.ok===false){
+      lastSubmittedRound=-1;
+      $('submittedBadge').classList.add('hidden');
+      toast(res?.error||'Drawing submission failed. Try again.');
+      sound('error');
+      return;
+    }
+    lastSubmittedRound=round;
+    $('submittedBadge').classList.remove('hidden');
+  });
+}
 $('submitDrawing').onclick=()=>{if(!isDrawer()||!room.chosenWord)return toast('Choose a word first.');submitDrawing();toast('Drawing submitted ✓')};
 $('endRound').onclick=()=>socket.emit('host:endRound');$('nextRound').onclick=()=>socket.emit('host:next');
 
@@ -157,8 +173,11 @@ socket.on('challenge:received',m=>{document.querySelectorAll('.challenge-banner'
 socket.on('moderation:removed',m=>{alert(m.banned?'You were banned from this room.':'You were kicked from this room.');location.reload()});
 socket.on('guess:correct',m=>{sound('correct');confetti(16);systemMessage(`🎯 ${m.avatar} ${m.name} guessed it! +${m.points} points`, 'correct-guess');if(m.drawerId===socket.id&&m.drawerBonus)toast(`+${m.drawerBonus} artist bonus`);else toast(`${m.name} +${m.points} points`);updatePlayers()});
 
-socket.on('drawing:submitted',m=>{votingDrawings[m.userId]=m.image;if(room?.status==='voting')renderVoting()});
-function renderVoting(){clearInterval(timer);selected={best:room.votes?.best?.[socket.id]||null,worst:room.votes?.worst?.[socket.id]||null,funniest:room.votes?.funniest?.[socket.id]||null};const cats=[['best','bestGallery'],['worst','worstGallery'],['funniest','funGallery']];cats.forEach(([cat,id])=>{const el=$(id);el.innerHTML='';Object.entries(votingDrawings).forEach(([uid,img])=>{const u=room.users.find(x=>x.id===uid);if(!u)return;const d=document.createElement('button');d.type='button';d.className='drawing-card';const voteCount=Object.values(room.votes?.[cat]||{}).filter(x=>x===uid).length;const voterTotal=room.users.filter(x=>x.connected).length;const votePct=voterTotal?Math.round((voteCount/voterTotal)*100):0;d.innerHTML=`<img src="${img}" alt="Drawing by ${esc(u.name)}"><span class="draw-name">${esc(u.avatar)} ${esc(u.name)}</span><span class="vote-button">${uid===socket.id?'Your drawing':'Vote'} <b class="vote-pct">${votePct}%</b></span><span class="vote-count">${voteCount} vote${voteCount===1?'':'s'}</span>`;if(uid===socket.id){d.disabled=true;d.classList.add('self')}else d.onclick=()=>{
+socket.on('drawing:submitted',m=>{
+  votingDrawings[m.userId]=m.image;
+  if(room?.status==='voting')renderVoting();
+});
+function renderVoting(){clearInterval(timer);selected={best:room.votes?.best?.[socket.id]||null,worst:room.votes?.worst?.[socket.id]||null,funniest:room.votes?.funniest?.[socket.id]||null};const cats=[['best','bestGallery'],['worst','worstGallery'],['funniest','funGallery']];cats.forEach(([cat,id])=>{const el=$(id);el.innerHTML='';const entries=Object.entries(votingDrawings);if(!entries.length){el.innerHTML='<div class="vote-loading">Waiting for the round drawings…</div>';return;}entries.forEach(([uid,img])=>{const u=room.users.find(x=>x.id===uid);if(!u)return;const d=document.createElement('button');d.type='button';d.className='drawing-card';const voteCount=Object.values(room.votes?.[cat]||{}).filter(x=>x===uid).length;const voterTotal=room.users.filter(x=>x.connected).length;const votePct=voterTotal?Math.round((voteCount/voterTotal)*100):0;d.innerHTML=`<img src="${img}" alt="Drawing by ${esc(u.name)}"><span class="draw-name">${esc(u.avatar)} ${esc(u.name)}</span><span class="vote-button">${uid===socket.id?'Your drawing':'Vote'} <b class="vote-pct">${votePct}%</b></span><span class="vote-count">${voteCount} vote${voteCount===1?'':'s'}</span>`;if(uid===socket.id){d.disabled=true;d.classList.add('self')}else d.onclick=()=>{
   selected[cat]=uid;
   sound('vote');
   socket.emit('vote',{category:cat,targetId:uid});
