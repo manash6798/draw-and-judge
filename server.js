@@ -33,15 +33,13 @@ function buildRoundDeck(){
 
 
 const ROUND_TYPES = [
-  { id: "valorant-main", title: "Your VALORANT main", subtitle: "Pick any Agent from the roster and draw them." },
-  { id: "valorant-agent", title: "Draw a VALORANT Agent from memory", subtitle: "Choose an Agent yourself, then draw it from memory." },
-  { id: "anime", title: "Draw an anime character", subtitle: "Pick a character from the secret character board." },
-  { id: "object", title: "Random doodle", subtitle: "Pick any word from the random doodle board." },
-  { id: "challenge", title: "Chaos challenge", subtitle: "Pick a word and follow the round rule." }
+  { id: "valorant-main", title: "Your VALORANT main", subtitle: "Choose 1 of 3 Agents and draw them." },
+  { id: "valorant-agent", title: "Draw a VALORANT Agent from memory", subtitle: "Choose 1 of 3 Agents, then draw it from memory." },
+  { id: "anime", title: "Draw an anime character", subtitle: "Choose 1 of 3 characters and draw them." },
+  { id: "object", title: "Random doodle", subtitle: "Choose 1 of 3 random words and draw it." }
 ];
 
 const avatarSet = ["🎨","🦊","🐸","🐼","🐱","🐙","🦄","👽","🤖","🍀","🌙","⭐","🍉","🍩","🧃","🦋","🐨","🐯","🐵","🍓","🌈","⚡","🔥","❄️","🌸","🪐","🎧","🕹️","👾","🥷"];
-const CHAOS_RULES = ["only use 3 colors", "don't use circles", "draw with your non-dominant hand", "use only shapes", "no erasing", "draw with one continuous line"];
 
 const DEFAULT_ROUNDS = buildRoundDeck();
 function makeCode(){ let c; do c=Math.random().toString(36).slice(2,7).toUpperCase(); while(rooms.has(c)); return c; }
@@ -59,31 +57,59 @@ function maskWord(word, hintLevel=0){
   }).join("   ");
 }
 function publicUser(u){ return {id:u.id,name:u.name,avatar:u.avatar,score:u.score,connected:u.connected,correct:u.correct}; }
-function roomJSON(room){ return {code:room.code,hostId:room.hostId,status:room.status,roundIndex:room.roundIndex,rounds:room.rounds,activeRound:room.activeRound,endsAt:room.endsAt,drawerId:room.drawerId,wordLocked:!!room.chosenWord,guessedIds:[...room.guessedIds],users:[...room.users.values()].map(publicUser),submitted:Object.keys(room.drawings),votes:room.votes,awardTotals:room.awardTotals}; }
+function roomJSON(room){ return {code:room.code,hostId:room.hostId,status:room.status,roundIndex:room.roundIndex,rounds:room.rounds,activeRound:room.activeRound,endsAt:room.endsAt,drawerId:room.drawerId,wordLocked:!!room.chosenWord,guessedIds:[...room.guessedIds],users:[...room.users.values()].map(publicUser),submitted:Object.keys(room.drawings),votes:room.votes,awardTotals:room.awardTotals,votingComplete:votingComplete(room)}; }
 function emitRoom(room){ io.to(room.code).emit("room:update",roomJSON(room)); }
-function setNewHost(room){ const candidate=[...room.users.values()].find(u=>u.connected)||[...room.users.values()][0]; room.hostId=candidate?candidate.id:null; }
+function setNewHost(room){
+  const candidates=[...room.users.values()].filter(u=>u.connected);
+  const candidate=candidates.length?candidates[Math.floor(Math.random()*candidates.length)]:null;
+  const previous=room.hostId;
+  room.hostId=candidate?candidate.id:null;
+  if(candidate && candidate.id!==previous){
+    io.to(room.code).emit("host:transferred",{hostId:candidate.id,name:candidate.name,avatar:candidate.avatar});
+  }
+}
 function connectedUsers(room){ return [...room.users.values()].filter(u=>u.connected); }
+function eligibleVoters(room){ return connectedUsers(room); }
+function votingComplete(room){
+  const voters=eligibleVoters(room);
+  if(!voters.length)return false;
+  return voters.every(u=>room.votes.best[u.id] && room.votes.worst[u.id] && room.votes.funniest[u.id]);
+}
+function guessesComplete(room){
+  const guessers=connectedUsers(room).filter(u=>u.id!==room.drawerId);
+  return guessers.length>0 && guessers.every(u=>room.guessedIds.has(u.id));
+}
+function pickThree(pool){
+  const unique=[...new Set(pool)];
+  return shuffle(unique).slice(0, Math.min(3, unique.length));
+}
 function optionsForType(room,type){
-  if(type.id === "valorant-main" || type.id === "valorant-agent") return shuffle(VALORANT_AGENTS);
-  if(type.id === "anime") return shuffle(ANIME_WORDS);
-  if(type.id === "challenge") return shuffle(OBJECT_WORDS).slice(0, Math.min(24, OBJECT_WORDS.length));
-  return shuffle(OBJECT_WORDS);
+  if(type.id === "valorant-main" || type.id === "valorant-agent") return pickThree(VALORANT_AGENTS);
+  if(type.id === "anime") return pickThree(ANIME_WORDS);
+  return pickThree(OBJECT_WORDS);
 }
 function startRound(room,index){
   const players=connectedUsers(room); if(!players.length)return;
   const base=room.rounds[index] || DEFAULT_ROUNDS[0];
   let type;
   if(base.theme==="random") {
-    const previous=room.lastRoundTypeId;
-    const pool=ROUND_TYPES.filter(t=>t.id!==previous);
+    const recent=room.recentRoundTypes||[];
+    // Keep categories random, but prevent VALORANT/anime categories from
+    // appearing too frequently. A special category cannot repeat within
+    // the previous two rounds; normal doodles fill the gaps.
+    let pool=ROUND_TYPES.filter(t=>{
+      if(recent.includes(t.id)) return t.id==="object";
+      return true;
+    });
+    if(!pool.length) pool=ROUND_TYPES;
     type=pool[Math.floor(Math.random()*pool.length)] || ROUND_TYPES[0];
   } else {
     type=ROUND_TYPES.find(t=>t.id===base.theme)||ROUND_TYPES[0];
   }
-  room.lastRoundTypeId=type.id;
+  room.lastRoundTypeId=type.id; room.recentRoundTypes=[...(room.recentRoundTypes||[]).filter(id=>id!==type.id),type.id].slice(-2);
   room.roundIndex=index; room.status="drawing"; room.drawings={}; room.drawActions=[]; room.votes={best:{},worst:{},funniest:{}}; room.guessedIds=new Set(); room.guessOrder=[];
   room.drawerId=players[index%players.length].id; room.chosenWord=""; room.playerOptions=new Map(); room.hintLevel=0; room.roundDuration=base.duration; room.startedAt=null; room.endsAt=null;
-  room.activeRound={id:type.id,title:type.title,subtitle:type.subtitle,rule:type.id==="challenge"?CHAOS_RULES[Math.floor(Math.random()*CHAOS_RULES.length)]:null,duration:base.duration};
+  room.activeRound={id:type.id,title:type.title,subtitle:type.subtitle,rule:null,duration:base.duration};
   const options=optionsForType(room,type); room.playerOptions.set(room.drawerId,options);
   io.to(room.drawerId).emit("round:options",{type:room.activeRound,options});
   io.to(room.code).emit("round:started",{drawerId:room.drawerId,type:room.activeRound});
@@ -96,7 +122,7 @@ io.on("connection",socket=>{
       name=cleanName(name); if(!name)return cb?.({ok:false,error:"Choose an anonymous nickname first."});
       if(rooms.size>=500)return cb?.({ok:false,error:"The server is busy. Try again in a moment."});
       const code=makeCode();
-      const room={code,hostId:socket.id,status:"lobby",roundIndex:-1,rounds:buildRoundDeck(),activeRound:null,endsAt:null,drawerId:null,chosenWord:"",users:new Map(),drawings:{},votes:{best:{},worst:{},funniest:{}},chat:[],usedAvatars:new Set(),bannedNames:new Set(),challenges:new Map(),awardTotals:{best:{},worst:{},funniest:{}},playerOptions:new Map(),guessedIds:new Set(),guessOrder:[],hintLevel:0,drawActions:[],lastRoundTypeId:null};
+      const room={code,hostId:socket.id,status:"lobby",roundIndex:-1,rounds:buildRoundDeck(),activeRound:null,endsAt:null,drawerId:null,chosenWord:"",users:new Map(),drawings:{},votes:{best:{},worst:{},funniest:{}},chat:[],usedAvatars:new Set(),bannedNames:new Set(),challenges:new Map(),awardTotals:{best:{},worst:{},funniest:{}},playerOptions:new Map(),guessedIds:new Set(),guessOrder:[],hintLevel:0,drawActions:[],lastRoundTypeId:null,recentRoundTypes:[]};
       room.users.set(socket.id,{id:socket.id,name,avatar:randomAvatar(room),score:0,correct:0,connected:true}); rooms.set(code,room); socket.join(code); socket.data.room=code; cb?.({ok:true,code}); emitRoom(room);
     }catch(err){ console.error("room:create failed",err); cb?.({ok:false,error:"Could not create the room. Please try again."}); }
   });
@@ -113,7 +139,7 @@ io.on("connection",socket=>{
   });
   socket.on("host:start",({rounds},cb)=>{ const room=rooms.get(socket.data.room); if(!room||room.hostId!==socket.id||room.status!=="lobby")return cb?.({ok:false,error:"The room is no longer ready to start."}); if(Array.isArray(rounds)&&rounds.length)room.rounds=rounds.slice(0,12).map(r=>({theme:ROUND_TYPES.some(t=>t.id===r.theme)?r.theme:"random",duration:Math.max(30,Math.min(180,Number(r.duration)||80))})); if(!room.rounds?.length)room.rounds=buildRoundDeck(); startRound(room,0); emitRoom(room); cb?.({ok:true}); });
   socket.on("host:endRound",()=>{const room=rooms.get(socket.data.room);if(room&&room.hostId===socket.id)enterVoting(room);});
-  socket.on("host:next",()=>{const room=rooms.get(socket.data.room);if(!room||room.hostId!==socket.id||room.status!=="voting")return;const next=room.roundIndex+1;if(next>=room.rounds.length){room.status="finished";room.endsAt=null;emitRoom(room);return;}startRound(room,next);emitRoom(room);});
+  socket.on("host:next",()=>{const room=rooms.get(socket.data.room);if(!room||room.hostId!==socket.id||room.status!=="voting")return;if(!votingComplete(room))return socket.emit("vote:error",{error:"Everyone must finish all 3 votes before the next round."});const next=room.roundIndex+1;if(next>=room.rounds.length){room.status="finished";room.endsAt=null;emitRoom(room);return;}startRound(room,next);emitRoom(room);});
   socket.on("words:get",()=>{const room=rooms.get(socket.data.room);if(!room||room.status!=="drawing"||room.drawerId!==socket.id||room.chosenWord)return;socket.emit("round:options",{type:room.activeRound,options:room.playerOptions.get(socket.id)||[]});});
   socket.on("word:choose",({word},cb)=>{
     const room=rooms.get(socket.data.room);
@@ -172,7 +198,17 @@ io.on("connection",socket=>{
     io.to(room.code).emit("drawing:submitted",{userId:socket.id,image});
     emitRoom(room);
   });
-  socket.on("vote",({category,targetId})=>{const room=rooms.get(socket.data.room);if(!room||room.status!=="voting"||!['best','worst','funniest'].includes(category)||!room.users.has(targetId)||targetId===socket.id)return;const previous=room.votes[category][socket.id];if(previous===targetId)return;if(previous)room.awardTotals[category][previous]=Math.max(0,(room.awardTotals[category][previous]||0)-1);room.votes[category][socket.id]=targetId;room.awardTotals[category][targetId]=(room.awardTotals[category][targetId]||0)+1;socket.emit("vote:accepted",{category,targetId});emitRoom(room);});
+  socket.on("vote",({category,targetId})=>{
+    const room=rooms.get(socket.data.room);
+    if(!room||room.status!=="voting"||!['best','worst','funniest'].includes(category)||!room.users.has(targetId)||targetId===socket.id)return;
+    const previous=room.votes[category][socket.id];
+    if(previous===targetId)return;
+    if(previous)room.awardTotals[category][previous]=Math.max(0,(room.awardTotals[category][previous]||0)-1);
+    room.votes[category][socket.id]=targetId;
+    room.awardTotals[category][targetId]=(room.awardTotals[category][targetId]||0)+1;
+    socket.emit("vote:accepted",{category,targetId,complete:votingComplete(room)});
+    emitRoom(room);
+  });
   socket.on("chat",({text})=>{
     const room=rooms.get(socket.data.room);if(!room)return;const user=room.users.get(socket.id);if(!user)return;text=String(text||"").trim().slice(0,300);if(!text)return;
     // The artist cannot submit guesses or reveal the answer through the guess chat.
