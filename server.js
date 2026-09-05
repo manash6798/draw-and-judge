@@ -169,7 +169,20 @@ function startRound(room,index){
   io.to(room.drawerId).emit("round:options",{type:room.activeRound,options});
   io.to(room.code).emit("round:started",{drawerId:room.drawerId,type:room.activeRound});
 }
-function enterVoting(room){ if(room.status!=="drawing")return; room.status="voting"; room.endsAt=null; room.chosenWord=""; room.hintLevel=0; room.playerOptions=new Map(); room.activeRound=null; room.votes={best:{},worst:{},funniest:{}}; emitRoom(room); }
+function enterVoting(room){
+  if(room.status!=="drawing")return;
+  // Keep the secret answer on the server until the drawing has been
+  // submitted. The drawer receives the voting room:update and submits its
+  // canvas immediately; clearing chosenWord here used to make that submit
+  // fail, leaving the voting screen completely empty.
+  room.status="voting";
+  room.endsAt=null;
+  room.hintLevel=0;
+  room.playerOptions=new Map();
+  room.activeRound=null;
+  room.votes={best:{},worst:{},funniest:{}};
+  emitRoom(room);
+}
 
 loadLobbyRooms();
 
@@ -256,12 +269,18 @@ io.on("connection",socket=>{
     room.drawActions=clean.slice(-12000);
     socket.to(room.code).emit("draw:sync",{actions:room.drawActions});
   });
-  socket.on("drawing:submit",({image})=>{
-    const room=rooms.get(socket.data.room); if(!room||!["drawing","voting"].includes(room.status)||room.drawerId!==socket.id||!room.chosenWord)return;
-    if(typeof image!=="string"||image.length>2500000)return;
+  socket.on("drawing:submit",({image},cb)=>{
+    const room=rooms.get(socket.data.room);
+    if(!room||!["drawing","voting"].includes(room.status)||room.drawerId!==socket.id||!room.chosenWord){
+      return cb?.({ok:false,error:"Your drawing is no longer available to submit."});
+    }
+    if(typeof image!=="string"||!image.startsWith("data:image/")||image.length>2500000){
+      return cb?.({ok:false,error:"That drawing is too large. Try submitting again."});
+    }
     room.drawings[socket.id]=image;
     io.to(room.code).emit("drawing:submitted",{userId:socket.id,image});
     emitRoom(room);
+    cb?.({ok:true});
   });
   socket.on("vote",({category,targetId})=>{
     const room=rooms.get(socket.data.room);
