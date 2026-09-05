@@ -1,4 +1,5 @@
 const path = require("path");
+const fs = require("fs");
 const http = require("http");
 const express = require("express");
 const { Server } = require("socket.io");
@@ -12,6 +13,51 @@ app.get("/health", (_req,res)=>res.status(200).json({ok:true,rooms:rooms.size}))
 const MAX_PLAYERS = 30;
 const rooms = new Map();
 const MAX_HINTS = 2;
+const LOBBY_SNAPSHOT_PATH = path.join("/tmp", "draw-and-judge-lobbies.json");
+
+let persistTimer = null;
+function persistLobbyRooms(){
+  if(persistTimer) clearTimeout(persistTimer);
+  persistTimer=setTimeout(()=>{
+    persistTimer=null;
+    try{
+      const snapshots=[...rooms.values()]
+        .filter(r=>r.status==="lobby")
+        .map(r=>({
+          code:r.code,
+          hostName:r.hostName || [...r.users.values()].find(u=>u.id===r.hostId)?.name || "",
+          hostNameKey:r.hostNameKey || nameKey(r.hostName || ""),
+          hostAvatar:r.hostAvatar || [...r.users.values()].find(u=>u.id===r.hostId)?.avatar || "🎨",
+          rounds:r.rounds,
+          bannedNames:[...r.bannedNames],
+          savedAt:Date.now()
+        }));
+      const tmp=LOBBY_SNAPSHOT_PATH+".tmp";
+      fs.writeFileSync(tmp,JSON.stringify(snapshots));
+      fs.renameSync(tmp,LOBBY_SNAPSHOT_PATH);
+    }catch(err){ console.warn("Lobby snapshot save skipped:",err.message); }
+  },50);
+}
+function loadLobbyRooms(){
+  try{
+    if(!fs.existsSync(LOBBY_SNAPSHOT_PATH)) return;
+    const snapshots=JSON.parse(fs.readFileSync(LOBBY_SNAPSHOT_PATH,"utf8"));
+    if(!Array.isArray(snapshots)) return;
+    const now=Date.now();
+    for(const s of snapshots){
+      const code=String(s?.code||"").trim().toUpperCase();
+      if(!/^[A-Z0-9]{5}$/.test(code)||rooms.has(code)) continue;
+      if(now-Number(s.savedAt||0)>30*60*1000) continue;
+      const room=createRoomState(code,null);
+      room.hostName=cleanName(s.hostName||"");
+      room.hostNameKey=s.hostNameKey||nameKey(room.hostName);
+      room.hostAvatar=s.hostAvatar||"🎨";
+      room.rounds=Array.isArray(s.rounds)&&s.rounds.length?s.rounds:buildRoundDeck();
+      room.bannedNames=new Set(Array.isArray(s.bannedNames)?s.bannedNames.map(nameKey):[]);
+      rooms.set(code,room);
+    }
+  }catch(err){ console.warn("Lobby snapshot load skipped:",err.message); }
+}
 
 // Current official VALORANT agent roster, including Miks and Veto.
 const VALORANT_AGENTS = [
@@ -46,6 +92,9 @@ function makeCode(){ let c; do c=Math.random().toString(36).slice(2,7).toUpperCa
 function cleanName(name){ return String(name||"").trim().replace(/\s+/g," ").slice(0,20); }
 function nameKey(name){ return cleanName(name).toLowerCase(); }
 function randomAvatar(room){ const available=avatarSet.filter(a=>!room.usedAvatars.has(a)); const pool=available.length?available:avatarSet; const avatar=pool[Math.floor(Math.random()*pool.length)]; room.usedAvatars.add(avatar); return avatar; }
+function createRoomState(code,hostId){
+  return {code,hostId,status:"lobby",roundIndex:-1,rounds:buildRoundDeck(),activeRound:null,endsAt:null,drawerId:null,chosenWord:"",users:new Map(),drawings:{},votes:{best:{},worst:{},funniest:{}},chat:[],usedAvatars:new Set(),bannedNames:new Set(),challenges:new Map(),awardTotals:{best:{},worst:{},funniest:{}},playerOptions:new Map(),guessedIds:new Set(),guessOrder:[],hintLevel:0,drawActions:[],lastRoundTypeId:null,recentRoundTypes:[],hostName:"",hostNameKey:"",hostAvatar:"🎨"};
+}
 function normalizeGuess(text){ return String(text||"").toLowerCase().trim().replace(/[^a-z0-9\s]/g,"").replace(/\s+/g," "); }
 function maskWord(word, hintLevel=0){
   let revealBudget=Math.max(1, 1+Math.min(MAX_HINTS, Number(hintLevel)||0));
@@ -64,9 +113,15 @@ function setNewHost(room){
   const candidate=candidates.length?candidates[Math.floor(Math.random()*candidates.length)]:null;
   const previous=room.hostId;
   room.hostId=candidate?candidate.id:null;
+  if(candidate){
+    room.hostName=candidate.name;
+    room.hostNameKey=nameKey(candidate.name);
+    room.hostAvatar=candidate.avatar;
+  }
   if(candidate && candidate.id!==previous){
     io.to(room.code).emit("host:transferred",{hostId:candidate.id,name:candidate.name,avatar:candidate.avatar});
   }
+  if(room.status==="lobby") persistLobbyRooms();
 }
 function connectedUsers(room){ return [...room.users.values()].filter(u=>u.connected); }
 function eligibleVoters(room){ return connectedUsers(room); }
@@ -116,20 +171,30 @@ function startRound(room,index){
 }
 function enterVoting(room){ if(room.status!=="drawing")return; room.status="voting"; room.endsAt=null; room.chosenWord=""; room.hintLevel=0; room.playerOptions=new Map(); room.activeRound=null; room.votes={best:{},worst:{},funniest:{}}; emitRoom(room); }
 
+loadLobbyRooms();
+
 io.on("connection",socket=>{
   socket.on("room:create",({name},cb)=>{
     try{
       name=cleanName(name); if(!name)return cb?.({ok:false,error:"Choose an anonymous nickname first."});
       if(rooms.size>=500)return cb?.({ok:false,error:"The server is busy. Try again in a moment."});
       const code=makeCode();
-      const room={code,hostId:socket.id,status:"lobby",roundIndex:-1,rounds:buildRoundDeck(),activeRound:null,endsAt:null,drawerId:null,chosenWord:"",users:new Map(),drawings:{},votes:{best:{},worst:{},funniest:{}},chat:[],usedAvatars:new Set(),bannedNames:new Set(),challenges:new Map(),awardTotals:{best:{},worst:{},funniest:{}},playerOptions:new Map(),guessedIds:new Set(),guessOrder:[],hintLevel:0,drawActions:[],lastRoundTypeId:null,recentRoundTypes:[]};
-      room.users.set(socket.id,{id:socket.id,name,avatar:randomAvatar(room),score:0,correct:0,connected:true}); rooms.set(code,room); socket.join(code); socket.data.room=code; cb?.({ok:true,code}); emitRoom(room);
+      const room=createRoomState(code,socket.id);
+      const user={id:socket.id,name,avatar:randomAvatar(room),score:0,correct:0,connected:true};
+      room.hostName=name; room.hostNameKey=nameKey(name); room.hostAvatar=user.avatar;
+      room.users.set(socket.id,user); rooms.set(code,room); socket.join(code); socket.data.room=code; persistLobbyRooms(); cb?.({ok:true,code}); emitRoom(room);
     }catch(err){ console.error("room:create failed",err); cb?.({ok:false,error:"Could not create the room. Please try again."}); }
   });
   socket.on("room:join",({code,name},cb)=>{
     code=String(code||"").trim().toUpperCase(); name=cleanName(name); const room=rooms.get(code);
     if(!room)return cb?.({ok:false,error:"That room doesn't exist."}); if(!name)return cb?.({ok:false,error:"Choose an anonymous nickname first."}); if(room.bannedNames.has(nameKey(name)))return cb?.({ok:false,error:"You are banned from this room."}); if(connectedUsers(room).length>=MAX_PLAYERS)return cb?.({ok:false,error:"This room is full (30 players)."});
-    room.users.set(socket.id,{id:socket.id,name,avatar:randomAvatar(room),score:0,correct:0,connected:true}); socket.join(code); socket.data.room=code; cb?.({ok:true,code}); emitRoom(room);
+    const avatar=randomAvatar(room);
+    const recoveredHost=!room.hostId && (room.hostNameKey===nameKey(name) || connectedUsers(room).length===0);
+    room.users.set(socket.id,{id:socket.id,name,avatar,score:0,correct:0,connected:true});
+    if(recoveredHost){
+      room.hostId=socket.id; room.hostName=name; room.hostNameKey=nameKey(name); room.hostAvatar=avatar;
+    }
+    socket.join(code); socket.data.room=code; persistLobbyRooms(); cb?.({ok:true,code}); emitRoom(room);
     if(room.status==='drawing'){
       socket.emit('draw:sync',{actions:room.drawActions||[]});
       if(room.chosenWord) socket.emit('word:locked',{drawerId:room.drawerId,hint:maskWord(room.chosenWord,room.hintLevel||0),hintsUsed:room.hintLevel||0,maxHints:MAX_HINTS,round:room.activeRound});
@@ -137,7 +202,7 @@ io.on("connection",socket=>{
       for(const [userId,image] of Object.entries(room.drawings||{})) socket.emit('drawing:submitted',{userId,image});
     }
   });
-  socket.on("host:start",({rounds},cb)=>{ const room=rooms.get(socket.data.room); if(!room||room.hostId!==socket.id||room.status!=="lobby")return cb?.({ok:false,error:"The room is no longer ready to start."}); if(Array.isArray(rounds)&&rounds.length)room.rounds=rounds.slice(0,12).map(r=>({theme:ROUND_TYPES.some(t=>t.id===r.theme)?r.theme:"random",duration:Math.max(30,Math.min(180,Number(r.duration)||80))})); if(!room.rounds?.length)room.rounds=buildRoundDeck(); startRound(room,0); emitRoom(room); cb?.({ok:true}); });
+  socket.on("host:start",({rounds},cb)=>{ const room=rooms.get(socket.data.room); if(!room||room.hostId!==socket.id||room.status!=="lobby")return cb?.({ok:false,error:"The room is no longer ready to start."}); if(Array.isArray(rounds)&&rounds.length)room.rounds=rounds.slice(0,12).map(r=>({theme:ROUND_TYPES.some(t=>t.id===r.theme)?r.theme:"random",duration:Math.max(30,Math.min(180,Number(r.duration)||80))})); if(!room.rounds?.length)room.rounds=buildRoundDeck(); startRound(room,0); persistLobbyRooms(); emitRoom(room); cb?.({ok:true}); });
   socket.on("host:endRound",()=>{const room=rooms.get(socket.data.room);if(room&&room.hostId===socket.id)enterVoting(room);});
   socket.on("host:next",()=>{const room=rooms.get(socket.data.room);if(!room||room.hostId!==socket.id||room.status!=="voting")return;if(!votingComplete(room))return socket.emit("vote:error",{error:"Everyone must finish all 3 votes before the next round."});const next=room.roundIndex+1;if(next>=room.rounds.length){room.status="finished";room.endsAt=null;emitRoom(room);return;}startRound(room,next);emitRoom(room);});
   socket.on("words:get",()=>{const room=rooms.get(socket.data.room);if(!room||room.status!=="drawing"||room.drawerId!==socket.id||room.chosenWord)return;socket.emit("round:options",{type:room.activeRound,options:room.playerOptions.get(socket.id)||[]});});
@@ -238,7 +303,20 @@ io.on("connection",socket=>{
     const message={id:Date.now()+Math.random(),name:user.name,avatar:user.avatar,text,time:Date.now(),guess:true};room.chat.push(message);if(room.chat.length>150)room.chat.shift();io.to(room.code).emit("chat",message);
   });
   socket.on("chat:history",()=>{const room=rooms.get(socket.data.room);if(room)socket.emit("chat:history",room.chat);});
-  socket.on("disconnect",()=>{const room=rooms.get(socket.data.room);if(!room)return;const user=room.users.get(socket.id);if(user)user.connected=false;if(room.hostId===socket.id)setNewHost(room);emitRoom(room);setTimeout(()=>{const r=rooms.get(room.code);if(r&&!connectedUsers(r).length)rooms.delete(room.code);},10*60*1000);});
+  socket.on("disconnect",()=>{
+    const room=rooms.get(socket.data.room); if(!room)return;
+    const user=room.users.get(socket.id); if(user)user.connected=false;
+    if(room.hostId===socket.id)setNewHost(room);
+    if(room.status==="lobby") persistLobbyRooms();
+    emitRoom(room);
+    setTimeout(()=>{
+      const r=rooms.get(room.code);
+      if(r&&!connectedUsers(r).length){
+        rooms.delete(room.code);
+        if(r.status==="lobby") persistLobbyRooms();
+      }
+    },10*60*1000);
+  });
 });
 setInterval(()=>{
   for(const room of rooms.values()){
