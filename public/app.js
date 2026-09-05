@@ -158,8 +158,16 @@ socket.on('moderation:removed',m=>{alert(m.banned?'You were banned from this roo
 socket.on('guess:correct',m=>{sound('correct');confetti(16);systemMessage(`🎯 ${m.avatar} ${m.name} guessed it! +${m.points} points`, 'correct-guess');if(m.drawerId===socket.id&&m.drawerBonus)toast(`+${m.drawerBonus} artist bonus`);else toast(`${m.name} +${m.points} points`);updatePlayers()});
 
 socket.on('drawing:submitted',m=>{votingDrawings[m.userId]=m.image;if(room?.status==='voting')renderVoting()});
-function renderVoting(){clearInterval(timer);selected={best:room.votes?.best?.[socket.id]||null,worst:room.votes?.worst?.[socket.id]||null,funniest:room.votes?.funniest?.[socket.id]||null};const cats=[['best','bestGallery'],['worst','worstGallery'],['funniest','funGallery']];cats.forEach(([cat,id])=>{const el=$(id);el.innerHTML='';Object.entries(votingDrawings).forEach(([uid,img])=>{const u=room.users.find(x=>x.id===uid);if(!u)return;const d=document.createElement('button');d.type='button';d.className='drawing-card';d.innerHTML=`<img src="${img}" alt="Drawing by ${esc(u.name)}"><span class="draw-name">${esc(u.avatar)} ${esc(u.name)}</span><span class="vote-button">${uid===socket.id?'Your drawing':'Vote'}</span>`;if(uid===socket.id){d.disabled=true;d.classList.add('self')}else d.onclick=()=>{selected[cat]=uid;sound('vote');socket.emit('vote',{category:cat,targetId:uid});updateVoteStatus();renderVotingSelection()};if(selected[cat]===uid)d.classList.add('selected');el.appendChild(d)})});updateVoteStatus()}
-function renderVotingSelection(){renderVoting();}
+function renderVoting(){clearInterval(timer);selected={best:room.votes?.best?.[socket.id]||null,worst:room.votes?.worst?.[socket.id]||null,funniest:room.votes?.funniest?.[socket.id]||null};const cats=[['best','bestGallery'],['worst','worstGallery'],['funniest','funGallery']];cats.forEach(([cat,id])=>{const el=$(id);el.innerHTML='';Object.entries(votingDrawings).forEach(([uid,img])=>{const u=room.users.find(x=>x.id===uid);if(!u)return;const d=document.createElement('button');d.type='button';d.className='drawing-card';const voteCount=Object.values(room.votes?.[cat]||{}).filter(x=>x===uid).length;const voterTotal=room.users.filter(x=>x.connected).length;const votePct=voterTotal?Math.round((voteCount/voterTotal)*100):0;d.innerHTML=`<img src="${img}" alt="Drawing by ${esc(u.name)}"><span class="draw-name">${esc(u.avatar)} ${esc(u.name)}</span><span class="vote-button">${uid===socket.id?'Your drawing':'Vote'} <b class="vote-pct">${votePct}%</b></span><span class="vote-count">${voteCount} vote${voteCount===1?'':'s'}</span>`;if(uid===socket.id){d.disabled=true;d.classList.add('self')}else d.onclick=()=>{
+  selected[cat]=uid;
+  sound('vote');
+  socket.emit('vote',{category:cat,targetId:uid});
+  el.querySelectorAll('.drawing-card').forEach(card=>card.classList.remove('selected'));
+  d.classList.add('selected');
+  updateVoteStatus();
+};
+if(selected[cat]===uid)d.classList.add('selected');
+el.appendChild(d)})});updateVoteStatus()}
 function updateVoteStatus(){const n=Object.values(selected).filter(Boolean).length;const done=!!room?.votingComplete;$('voteStatus').textContent=done?'All players have voted ✓':`${n}/3 awards selected • waiting for everyone to finish`;const next=$('nextRound');if(next){next.disabled=!done||!isHost();next.title=done?'Ready for the next round':'Waiting for all players to finish voting';}}
 socket.on('vote:accepted',m=>{sound('vote');toast(`${m.category==='best'?'Best':m.category==='worst'?'Worst':'Funniest'} vote recorded ✓`);if(room)room.votingComplete=!!m.complete;updateVoteStatus()});
 socket.on('vote:error',m=>{toast(m?.error||'Finish all votes before continuing.');sound('error');updateVoteStatus()});
