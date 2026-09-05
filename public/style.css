@@ -55,3 +55,52 @@ html,body{background:radial-gradient(circle at 5% 8%,#ffd9e8 0,transparent 24%),
 @keyframes confetti-fall{0%{opacity:0;transform:translateY(0) translateX(0) rotate(0deg) scale(.7)}12%{opacity:1}100%{opacity:0;transform:translateY(110vh) translateX(var(--dx)) rotate(var(--rot)) scale(1)}}
 .round-pop .game-head,.round-pop .canvas-card{animation:round-pop .45s ease-out}
 @keyframes round-pop{0%{transform:scale(.985)}60%{transform:scale(1.008)}100%{transform:scale(1)}}
+
+
+/* V16 contrast + responsive polish */
+.setup-panel h2:after{content:none!important}
+.word-choice{color:#2c2530!important;text-shadow:none!important;font-weight:800!important;background:#fff!important}
+.word-choice:nth-child(3n+1),.word-choice:nth-child(3n+2),.word-choice:nth-child(3n+3){color:#2c2530!important}
+.word-choice:disabled{opacity:1!important;color:#2c2530!important}
+.choice-head span{color:#2c2530!important}
+.choice-head small{color:#756b78!important}
+.toolbar .tool,.toolbar .swatch,.toolbar .clear{color:#2c2530}
+.toolbar .tool.active{color:#4f3cb0!important}
+.game-head h2,.game-head .word-hint{color:#2c2530}
+.type-kicker{color:#b06d00!important}
+.canvas-card{background:#fffdf8!important}
+@media(max-width:900px){
+  .screen{padding:28px 14px 90px}
+  .game-layout{grid-template-columns:1fr}
+  .game-sidebar{display:flex;flex-direction:column}
+  .canvas-wrap{height:min(56vh,560px);min-height:300px}
+  .word-choices{padding-top:10px}
+  .choice-grid{grid-template-columns:repeat(2,minmax(0,1fr));max-height:190px}
+  .toolbar{overflow-x:auto;flex-wrap:nowrap;align-items:center;padding:9px;gap:7px;-webkit-overflow-scrolling:touch}
+  .toolbar .tool-group{flex-wrap:nowrap;flex:0 0 auto}
+  .color-tools{flex:0 0 auto;margin-left:0;flex-wrap:nowrap}
+  .brush{flex:0 0 auto}
+}
+@media(max-width:560px){
+  .clean-header{background:#fffdf8}
+  .game-head{gap:10px}
+  .game-head h2{font-size:25px}
+  .round-meta{flex-wrap:wrap}
+  .timer-wrap{min-width:84px;padding:8px 10px}
+  .timer-wrap strong{font-size:23px}
+  .canvas-wrap{height:52vh;min-height:280px;max-height:500px}
+  .choice-grid{grid-template-columns:repeat(2,minmax(0,1fr));max-height:170px}
+  .word-choice{min-height:42px;padding:8px 6px;font-size:11px}
+  .toolbar{border-radius:13px}
+  .tool{min-height:38px;white-space:nowrap}
+  .swatch{flex:0 0 28px}
+}
+
+/* V17: header removed; connection status lives inside the setup card. */
+.clean-header{display:none!important}
+.connection-status{display:flex;align-items:center;justify-content:center;gap:9px;margin-top:14px;padding:9px 12px;border:2px dashed #ded2c4;border-radius:12px;background:#fffaf3;color:#7b707a;font-size:10px;font-weight:600}
+.connection-status b{color:#403645}
+.connection-status .status-dot{flex:0 0 auto;width:24px;height:24px}
+.connection-status:has(.status-dot.online){border-color:#bcebd7;background:#f1fff8}
+.connection-status:has(.status-dot.offline){border-color:#ffc5cb;background:#fff4f5}
+@media(max-width:560px){.connection-status{font-size:9px;padding:8px 10px}}
