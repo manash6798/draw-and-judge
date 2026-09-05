@@ -1,4 +1,4 @@
-const socket=io();
+const socket=io({transports:['websocket','polling'],upgrade:true,reconnection:true,reconnectionAttempts:8,reconnectionDelay:800,reconnectionDelayMax:5000,timeout:10000});
 const $=id=>document.getElementById(id);
 const screens=[...document.querySelectorAll('.screen')];
 let room=null,lastStatus=null,timer=null,createMode=true,roundsDraft=[],lastCanvasRound=-1,lastSubmittedRound=-1;
@@ -49,7 +49,7 @@ $('createBtn').onclick=()=>openSetup(true);$('joinBtn').onclick=()=>openSetup(fa
 function openSetup(create){createMode=create;$('setupTitle').textContent=create?'Create an event':'Join an event';$('continueBtn').textContent=create?'Create room':'Join room';$('codeBox').classList.toggle('hidden',create);$('nameInput').value=localStorage.getItem('dj_name')||randomName();$('setupError').textContent='';show('setup')}
 $('continueBtn').onclick=()=>{
   $('setupError').textContent='';
-  if(!socket.connected){$('setupError').textContent='Server is offline. Wait for the status to show O, then try again.';return}
+  if(!socket.connected){$('setupError').textContent='Server is offline. Wait for C to change to O, then try again.';sound('error');return}
   const name=$('nameInput').value.trim();
   if(!name)return $('setupError').textContent='Choose an anonymous nickname.';
   if(!createMode&&$('codeInput').value.trim().length<5)return $('setupError').textContent='Enter the 5-character room code.';
@@ -58,17 +58,23 @@ $('continueBtn').onclick=()=>{
   const payload=createMode?{name}:{name,code:$('codeInput').value.trim()};
   $('continueBtn').disabled=true; $('continueBtn').textContent=createMode?'Creating room…':'Joining room…';
   let answered=false;
-  const failTimer=setTimeout(()=>{if(answered)return;answered=true;$('continueBtn').disabled=false;$('continueBtn').textContent=createMode?'Create room':'Join room';$('setupError').textContent='The game server did not respond. Check Render and try again.'},9000);
-  socket.emit(event,payload,res=>{
-    if(answered)return; answered=true; clearTimeout(failTimer);
-    $('continueBtn').disabled=false; $('continueBtn').textContent=createMode?'Create room':'Join room';
-    if(!res?.ok){$('setupError').textContent=res?.error||'Could not connect to the room.';return}
-    setTimeout(()=>socket.emit('chat:history'),80);
-  });
+  const failTimer=setTimeout(()=>{if(answered)return;answered=true;$('continueBtn').disabled=false;$('continueBtn').textContent=createMode?'Create room':'Join room';$('setupError').textContent='The server did not respond. If Render just restarted, wait a few seconds and try again.';sound('error')},9000);
+  try{
+    socket.timeout(8500).emit(event,payload,(err,res)=>{
+      if(answered)return; answered=true; clearTimeout(failTimer);
+      $('continueBtn').disabled=false; $('continueBtn').textContent=createMode?'Create room':'Join room';
+      if(err){$('setupError').textContent='Connection timed out. Check Render, then try again.';sound('error');return}
+      if(!res?.ok){$('setupError').textContent=res?.error||'Could not connect to the room.';sound('error');return}
+      sound('join');
+      setTimeout(()=>socket.emit('chat:history'),80);
+    });
+  }catch(err){
+    clearTimeout(failTimer);$('continueBtn').disabled=false;$('continueBtn').textContent=createMode?'Create room':'Join room';$('setupError').textContent='Could not contact the game server. Try again.';sound('error');
+  }
 };
 $('copyCode').onclick=async()=>{try{await navigator.clipboard.writeText(room.code);$('copyCode').textContent='Copied ✓';setTimeout(()=>$('copyCode').textContent='Copy',1300)}catch{toast('Room code: '+room.code)}};$('gameCopyCode').onclick=async()=>{try{await navigator.clipboard.writeText(room.code);$('gameCopyCode').textContent='Copied ✓';setTimeout(()=>$('gameCopyCode').textContent='Copy',1300)}catch{toast('Room code: '+room.code)}};
 
-$('startEvent').onclick=()=>{if(!socket.connected)return toast('Not connected — wait for O status.');$('startEvent').disabled=true;$('startEvent').textContent='Starting…';socket.emit('host:start',{rounds:roundsDraft},res=>{if(res?.ok===false){$('startEvent').disabled=false;$('startEvent').textContent='Start game →';toast(res.error||'Could not start game.')}})};
+$('startEvent').onclick=()=>{if(!socket.connected)return toast('Not connected — wait for O status.');$('startEvent').disabled=true;$('startEvent').textContent='Starting…';socket.timeout(8500).emit('host:start',{rounds:roundsDraft},(err,res)=>{if(err||res?.ok===false){$('startEvent').disabled=false;$('startEvent').textContent='Start game →';toast(err?'Server did not respond. Try again.':(res?.error||'Could not start game.'));sound('error')}})};
 
 function playerHTML(u,moderation=false){const controls=moderation&&isHost()&&u.id!==socket.id&&u.connected?`<span class="player-actions"><button class="kick" data-action="kick" data-id="${u.id}">Kick</button><button class="ban" data-action="ban" data-id="${u.id}">Ban</button></span>`:'';const drawer=u.id===room.drawerId&&room.status==='drawing';const guessed=room.guessedIds?.includes(u.id);return `<div class="player ${drawer?'is-drawer':''} ${guessed?'is-guessed':''}"><div class="avatar">${esc(u.avatar)}</div><span class="pname">${esc(u.name)}${drawer?'<small class="drawer-label">DRAWING</small>':''}</span><span class="score-pill">${u.score||0}</span>${u.id===room.hostId?'<span class="host-tag">HOST</span>':''}${guessed?'<span class="guess-check">✓</span>':''}${controls}</div>`}
 function bindModeration(){document.querySelectorAll('.player-actions button').forEach(btn=>btn.onclick=()=>{const action=btn.dataset.action,id=btn.dataset.id,user=room.users.find(u=>u.id===id);if(user&&confirm(`${action==='ban'?'Ban':'Kick'} ${user.name}?`))socket.emit('host:moderate',{targetId:id,action})})}
