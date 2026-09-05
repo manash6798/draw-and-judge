@@ -77,16 +77,18 @@
 
 <section id="game" class="screen">
   <div class="eventbar">
-    <div><span id="roundLabel">ROUND 1 OF 5</span><h2 id="prompt">Draw!</h2></div>
+    <div><span id="roundLabel">ROUND 1 OF 5</span><h2 id="prompt">Pick a word</h2><div id="wordHint" class="word-hint">Choose a word below</div></div>
     <div class="timer-wrap"><small>TIME LEFT</small><strong id="timer">01:00</strong></div>
   </div>
   <div class="game-grid">
     <div class="panel drawing-panel">
       <div class="canvas-wrap"><canvas id="canvas"></canvas><div id="submittedBadge" class="submitted-badge hidden">✓ Submitted</div></div>
+      <div id="wordChoices" class="word-choices hidden"></div>
       <div class="toolbar">
-        <button class="tool active" data-tool="pen">✏️ <span>Pen</span></button>
-        <button class="tool" data-tool="eraser">🧽 <span>Eraser</span></button>
+        <div class="tool-group"><span class="tool-label">Draw</span><button class="tool active" data-tool="pen">✏️ <span>Pen</span></button><button class="tool" data-tool="eraser">🧽 <span>Eraser</span></button><button class="tool" data-tool="line">╱ <span>Line</span></button><button class="tool" data-tool="rect">□ <span>Box</span></button><button class="tool" data-tool="circle">○ <span>Circle</span></button><button class="tool" data-tool="triangle">△ <span>Triangle</span></button></div>
+        <div class="color-tools"><button class="swatch active" data-color="#111111" style="--sw:#111111"></button><button class="swatch" data-color="#ef4444" style="--sw:#ef4444"></button><button class="swatch" data-color="#3b82f6" style="--sw:#3b82f6"></button><button class="swatch" data-color="#22c55e" style="--sw:#22c55e"></button><button class="swatch" data-color="#f59e0b" style="--sw:#f59e0b"></button><button class="swatch" data-color="#a855f7" style="--sw:#a855f7"></button></div>
         <div class="brush"><span>Size</span><input id="size" type="range" min="2" max="28" value="6"></div>
+        <label id="fillWrap" class="fill-wrap hidden"><input id="fillShape" type="checkbox"> Fill</label>
         <button class="tool clear" id="clearCanvas">Clear</button>
         <button class="btn primary submit" id="submitDrawing">Submit drawing</button>
       </div>
