@@ -104,3 +104,79 @@ html,body{background:radial-gradient(circle at 5% 8%,#ffd9e8 0,transparent 24%),
 .connection-status:has(.status-dot.online){border-color:#bcebd7;background:#f1fff8}
 .connection-status:has(.status-dot.offline){border-color:#ffc5cb;background:#fff4f5}
 @media(max-width:560px){.connection-status{font-size:9px;padding:8px 10px}}
+
+/* V18 mobile-first game board: canvas + tools + guess chat stay primary. */
+#game .game-layout{align-items:start}
+#game .play-area{min-width:0}
+#game .canvas-card{overflow:hidden}
+#game .toolbar{scrollbar-width:none}
+#game .toolbar::-webkit-scrollbar{display:none}
+#undoDrawing.disabled,#redoDrawing.disabled{opacity:.45}
+#undoDrawing:not(:disabled):hover,#redoDrawing:not(:disabled):hover{background:#fff0f6;border-color:#ff5b8d}
+
+@media (max-width:900px){
+  #game{padding-left:10px;padding-right:10px}
+  #game .game-head{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:8px}
+  #game .game-head h2{font-size:24px;line-height:1.05;margin:5px 0 4px}
+  #game .word-hint{font-size:10px;line-height:1.35}
+  #game .game-room-code{position:fixed;left:50%;bottom:calc(8px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:120;display:flex;align-items:center;gap:7px;padding:5px 7px 5px 10px;border-width:2px;border-radius:999px;box-shadow:3px 3px 0 #2c2530;font-size:9px;white-space:nowrap}
+  #game .game-room-code strong{font-size:13px!important;letter-spacing:.14em}
+  #game .game-room-code button{padding:5px 8px;font-size:9px}
+  #game{padding-bottom:78px}
+  #game .game-layout{display:grid;grid-template-columns:1fr;gap:10px}
+  #game .game-sidebar{display:contents}
+  #game .play-area{order:1}
+  #game .chat-box{order:2}
+  #game .players-panel{order:3}
+  #game .host-tools{order:4}
+  #game .canvas-card{padding:6px;border-radius:16px}
+  #game .canvas-wrap{height:min(58vh,440px);min-height:260px;max-height:440px;border-radius:11px}
+  #game .word-choices{padding:7px 0 3px}
+  #game .choice-head{padding:2px 3px 6px}
+  #game .choice-head span{font-size:11px}
+  #game .choice-head small{font-size:9px}
+  #game .choice-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;max-height:150px;overflow-y:auto;padding:2px 4px 5px}
+  #game .word-choice{min-height:38px;padding:7px 5px;font-size:10px;border-width:2px!important;box-shadow:3px 3px 0 #cfdcff!important}
+  #game .toolbar{margin-top:6px;padding:7px;gap:6px;border-width:2px;border-radius:12px;overflow-x:auto;flex-wrap:nowrap}
+  #game .tool-group{gap:5px}
+  #game .tool-label{display:none}
+  #game .tool{flex:0 0 38px;width:38px;height:38px;min-height:38px;padding:0;font-size:16px;display:grid;place-items:center}
+  #game .tool span{display:none}
+  #game .swatch{flex:0 0 27px;width:27px;height:27px}
+  #game .brush{flex:0 0 92px;gap:4px}
+  #game .brush span{font-size:8px}
+  #game .brush input{width:66px}
+  #game .fill-wrap{flex:0 0 auto;font-size:9px;white-space:nowrap}
+  #game .clear{flex:0 0 auto;padding:0 10px!important;width:auto!important;font-size:10px!important}
+  #game .submit{flex:0 0 auto;width:auto!important;padding:9px 11px!important;font-size:9px}
+  #game .chat-box{min-height:210px;height:250px}
+  #game .messages{min-height:0;max-height:none;padding:7px 2px}
+  #game .chat-row{min-height:43px}
+  #game .chat-row input{font-size:13px;padding:10px}
+  #game .chat-row button{width:38px}
+  #game .players-panel{min-height:0}
+  #game .side-players{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;max-height:150px;overflow:auto}
+  #game .side-players .player{min-width:0;padding:6px}
+  #game .side-players .pname{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #game .host-tools{margin-bottom:2px}
+  #game .host-bar{position:relative;margin-bottom:0}
+}
+
+@media (max-width:560px){
+  #game{padding-top:12px}
+  #game .round-meta{gap:4px}
+  #game .round-meta span{font-size:8px}
+  #game .mode-chip{padding:4px 6px}
+  #game .type-kicker{font-size:9px;margin-top:3px}
+  #game .drawer-badge{font-size:8px;padding:5px 8px;margin:5px 0}
+  #game .timer-wrap{min-width:76px;padding:6px 8px;border-width:2px;box-shadow:3px 3px 0 #ffcf69}
+  #game .timer-wrap small{font-size:7px}
+  #game .timer-wrap strong{font-size:20px}
+  #game .canvas-wrap{height:min(56vh,400px);min-height:250px}
+  #game .side-title strong{font-size:14px}
+  #game .score-head{font-size:7px}
+}
+
+@media (min-width:901px){
+  #game .toolbar{position:sticky;bottom:10px;z-index:20;padding:10px;background:rgba(255,255,255,.97);backdrop-filter:blur(8px)}
+}
