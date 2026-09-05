@@ -90,13 +90,6 @@ io.on("connection", socket => {
     if (!name) return cb?.({ ok:false, error:"Choose an anonymous nickname first." });
 
     const code = makeCode();
-    const user = {
-      id: socket.id,
-      name,
-      avatar: randomAvatar(room),
-      score: 0,
-      connected: true
-    };
 
     const room = {
       code,
@@ -105,7 +98,7 @@ io.on("connection", socket => {
       roundIndex: -1,
       rounds: DEFAULT_ROUNDS.map(r => ({...r})),
       endsAt: null,
-      users: new Map([[socket.id, user]]),
+      users: new Map(),
       drawings: {},
       votes: { best:{}, worst:{}, funniest:{} },
       chat: [],
@@ -113,6 +106,15 @@ io.on("connection", socket => {
       bannedNames: new Set(),
       challenges: new Map()
     };
+
+    const user = {
+      id: socket.id,
+      name,
+      avatar: randomAvatar(room),
+      score: 0,
+      connected: true
+    };
+    room.users.set(socket.id, user);
 
     rooms.set(code, room);
     socket.join(code);
