@@ -1,140 +1,20 @@
-
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0a0b10">
-<title>Draw & Judge</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/style.css">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#090b10">
+<title>Draw & Judge — Art Game</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="/style.css">
 </head>
-<body>
-<div class="shell">
-<header class="topbar">
-  <div class="brand"><div class="brandmark">🎨</div><div><strong>Draw & Judge</strong><small>anonymous community events</small></div></div>
-  <div id="online" class="status-dot"><i></i> Connecting</div>
-</header>
-
+<body><div class="shell">
+<header class="topbar"><div class="brand"><div class="brandmark">✦</div><div><strong>DRAW & JUDGE</strong><small>community art game</small></div></div><div id="online" class="status-dot"><i></i> Connecting</div></header>
 <main>
-<section id="home" class="screen active">
-  <div class="hero">
-    <div class="hero-badge">🎨 COMMUNITY DRAWING NIGHT</div>
-    <h1>Draw.<br><em>Judge.</em><br>Laugh.</h1>
-    <p>A private, anonymous drawing room for your Discord community. No account. No email. Just pick a nickname and join.</p>
-    <div class="home-buttons">
-      <button class="btn primary" id="createBtn">Create an event <span>→</span></button>
-      <button class="btn ghost" id="joinBtn">Join with room code</button>
-    </div>
-  </div>
-  <div class="stats">
-    <div><b>30</b><span>players / room</span></div>
-    <div><b>5+</b><span>custom rounds</span></div>
-    <div><b>3</b><span>award categories</span></div>
-  </div>
-</section>
-
-<section id="setup" class="screen">
-  <div class="panel setup-panel">
-    <button class="back" id="backSetup">← Back</button>
-    <div class="mini-icon">👤</div>
-    <div class="eyebrow">ANONYMOUS LOGIN</div>
-    <h2 id="setupTitle">Create an event</h2>
-    <p class="sub">No signup. Your nickname is only used inside this room.</p>
-    <label>Anonymous nickname</label>
-    <div class="name-box"><span>✦</span><input id="nameInput" maxlength="20" placeholder="e.g. PixelBean" autocomplete="off"><button id="randomName" title="Random nickname">🎲</button></div>
-    <div id="codeBox" class="hidden">
-      <label>Room code</label>
-      <input id="codeInput" maxlength="5" placeholder="ABCDE" autocapitalize="characters">
-    </div>
-    <button class="btn primary full" id="continueBtn">Continue</button>
-    <div class="privacy-note">🔒 Nothing here requires a real identity.</div>
-    <div id="setupError" class="error"></div>
-  </div>
-</section>
-
-<section id="lobby" class="screen">
-  <div class="lobby-head">
-    <div><div class="eyebrow">EVENT LOBBY</div><h2>Get everyone in.</h2><p class="sub">Share the code below with your Discord server.</p></div>
-    <div class="room-code-box"><small>ROOM CODE</small><strong id="roomCode">-----</strong><button id="copyCode">Copy</button></div>
-  </div>
-  <div class="lobby-grid">
-    <div class="panel">
-      <div class="panel-title"><span>Players</span><b id="playerCount">0/30</b></div>
-      <div id="players" class="player-grid"></div>
-      <p class="mod-note" id="modNote">Host controls: kick or ban players from this room.</p>
-    </div>
-    <div class="panel host-panel">
-      <div class="eyebrow">HOST SETUP</div><h3>Round prompts</h3><p class="sub">Make your own challenges or use the defaults.</p>
-      <div id="roundEditor"></div>
-      <div class="round-actions"><button class="btn ghost full" id="addRound">＋ Add round</button><button class="btn primary full" id="startEvent">Start event →</button></div>
-      <p id="hostNote" class="host-note">Waiting for the host…</p>
-    </div>
-  </div>
-</section>
-
-<section id="game" class="screen">
-  <div class="eventbar">
-    <div><span id="roundLabel">ROUND 1 OF 5</span><h2 id="prompt">Pick a word</h2><div id="wordHint" class="word-hint">Choose a word below</div></div>
-    <div class="timer-wrap"><small>TIME LEFT</small><strong id="timer">01:00</strong></div>
-  </div>
-  <div class="game-grid">
-    <div class="panel drawing-panel">
-      <div class="canvas-wrap"><canvas id="canvas"></canvas><div id="submittedBadge" class="submitted-badge hidden">✓ Submitted</div></div>
-      <div id="wordChoices" class="word-choices hidden"></div>
-      <div class="toolbar">
-        <div class="tool-group"><span class="tool-label">Draw</span><button class="tool active" data-tool="pen">✏️ <span>Pen</span></button><button class="tool" data-tool="eraser">🧽 <span>Eraser</span></button><button class="tool" data-tool="line">╱ <span>Line</span></button><button class="tool" data-tool="rect">□ <span>Box</span></button><button class="tool" data-tool="circle">○ <span>Circle</span></button><button class="tool" data-tool="triangle">△ <span>Triangle</span></button></div>
-        <div class="color-tools"><button class="swatch active" data-color="#111111" style="--sw:#111111"></button><button class="swatch" data-color="#ef4444" style="--sw:#ef4444"></button><button class="swatch" data-color="#3b82f6" style="--sw:#3b82f6"></button><button class="swatch" data-color="#22c55e" style="--sw:#22c55e"></button><button class="swatch" data-color="#f59e0b" style="--sw:#f59e0b"></button><button class="swatch" data-color="#a855f7" style="--sw:#a855f7"></button></div>
-        <div class="brush"><span>Size</span><input id="size" type="range" min="2" max="28" value="6"></div>
-        <label id="fillWrap" class="fill-wrap hidden"><input id="fillShape" type="checkbox"> Fill</label>
-        <button class="tool clear" id="clearCanvas">Clear</button>
-        <button class="btn primary submit" id="submitDrawing">Submit drawing</button>
-      </div>
-    </div>
-    <aside class="panel sidebar">
-      <div class="panel-title"><span>Players</span><b id="liveCount">0</b></div>
-      <div id="sidePlayers" class="side-players"></div>
-      <div id="hostTools" class="host-tools hidden">
-        <div class="host-tools-title">👑 Host tools</div>
-        <label>Give a specific challenge</label>
-        <select id="challengeTarget"></select>
-        <div class="challenge-row"><input id="challengeInput" maxlength="180" placeholder="e.g. Draw Jett with only 3 colors"><button id="sendChallenge">Send</button></div>
-        <small>Only the selected player will see the challenge.</small>
-      </div>
-      <div class="chat-box">
-        <div class="panel-title"><span>Room chat</span><small>anonymous</small></div>
-        <div id="messages" class="messages"></div>
-        <div class="chat-row"><input id="chatInput" maxlength="300" placeholder="Type a message…"><button id="chatSend">➤</button></div>
-      </div>
-    </aside>
-  </div>
-  <div id="hostGameControls" class="host-bar hidden"><span>👑 You are hosting</span><button class="btn ghost" id="endRound">End round & start voting</button></div>
-</section>
-
-<section id="voting" class="screen">
-  <div class="center-head"><div class="eyebrow">ROUND COMPLETE</div><h1>Now we judge. 👀</h1><p class="sub">Choose one drawing for each category. You can't vote for yourself.</p></div>
-  <div class="vote-grid">
-    <div class="award-card"><h3>🏆 <span>Best Drawing</span></h3><div id="bestGallery" class="gallery"></div></div>
-    <div class="award-card"><h3>💀 <span>Worst Drawing</span></h3><div id="worstGallery" class="gallery"></div></div>
-    <div class="award-card"><h3>😭 <span>Funniest Drawing</span></h3><div id="funGallery" class="gallery"></div></div>
-  </div>
-  <div class="vote-footer"><span id="voteStatus">0/3 selected</span><button id="nextRound" class="btn primary hidden">Next round →</button></div>
-</section>
-
-<section id="finished" class="screen">
-  <div class="panel final-panel">
-    <div class="mini-icon">🏆</div><div class="eyebrow">EVENT COMPLETE</div><h1>And the winners are…</h1>
-    <div id="awardWinners"></div>
-    <div class="final-divider"></div><h3>Overall leaderboard</h3><div id="leaderboard"></div>
-    <button class="btn primary" id="homeBtn">Create another event</button>
-  </div>
-</section>
+<section id="home" class="screen active"><div class="home-stage"><div class="hero-art"><span>◯</span><span>△</span><span>✦</span><span>✎</span><span>□</span></div><div class="hero"><div class="hero-badge">COMMUNITY ART NIGHT</div><h1>Draw it.<br><em>Guess it.</em><br>Judge it.</h1><p>One artist gets a secret choice. Everyone else races the clock, guesses in chat, and climbs the scoreboard.</p><div class="home-buttons"><button class="btn primary" id="createBtn">Create room <span>→</span></button><button class="btn ghost" id="joinBtn">Join with code</button></div></div></div><div class="feature-strip"><div><b>30</b><span>players</span></div><div><b>∞</b><span>random prompts</span></div><div><b>+pts</b><span>fast guesses</span></div><div><b>3</b><span>round awards</span></div></div></section>
+<section id="setup" class="screen"><div class="panel setup-panel"><button class="back" id="backSetup">← Back</button><div class="mini-icon">✦</div><div class="eyebrow">PLAYER SETUP</div><h2 id="setupTitle">Create an event</h2><p class="sub">Anonymous nickname only. No account, email or password.</p><label>Nickname</label><div class="name-box"><span>✦</span><input id="nameInput" maxlength="20" placeholder="e.g. PixelBean" autocomplete="off"><button id="randomName" title="Random nickname">🎲</button></div><div id="codeBox" class="hidden"><label>Room code</label><input id="codeInput" maxlength="5" placeholder="ABCDE" autocapitalize="characters"></div><button class="btn primary full" id="continueBtn">Create room</button><div class="privacy-note">◉ Anonymous by design · up to 30 players</div><div id="setupError" class="error"></div></div></section>
+<section id="lobby" class="screen"><div class="lobby-head"><div><div class="eyebrow">ROOM LOBBY</div><h2>Build your art night.</h2><p class="sub">The game picks the challenge type randomly when each round begins.</p></div><div class="room-code-box"><small>ROOM CODE</small><strong id="roomCode">-----</strong><button id="copyCode">Copy</button></div></div><div class="lobby-grid"><div class="panel"><div class="panel-title"><span>Artists in the room</span><b id="playerCount">0/30</b></div><div id="players" class="player-grid"></div><p class="mod-note">Host can kick or ban players.</p></div><div class="panel host-panel"><div class="eyebrow">HOST SETUP</div><h3>Random round deck</h3><p class="sub">VALORANT, members, anime, doodles and chaos challenges are mixed automatically.</p><div class="default-rules"><div class="rule-stat"><strong>10</strong><span>Rounds</span></div><div class="rule-stat"><strong>80s</strong><span>Draw time</span></div><div class="rule-stat"><strong>2</strong><span>Hints</span></div></div><div class="round-actions"><button class="btn primary full" id="startEvent">Start game →</button></div><p id="hostNote" class="host-note">Waiting for the host…</p></div></div></section>
+<section id="game" class="screen"><div class="game-head"><div><div class="round-meta"><span id="roundLabel">ROUND 1 OF 10</span><span class="mode-chip">DRAW • GUESS • SCORE</span></div><div class="type-kicker" id="roundType">Random challenge</div><h2 id="prompt">Choose your secret word</h2><div id="wordHint" class="word-hint">Pick one option. Everyone else is guessing. Two hints will unlock during the round.</div></div><div class="timer-wrap"><small>TIME LEFT</small><strong id="timer">01:20</strong></div></div><div class="game-room-code"><span>ROOM</span><strong id="gameRoomCode">-----</strong><button id="gameCopyCode">Copy</button></div><div id="drawerBadge" class="drawer-badge">ARTIST IS DRAWING</div><div class="game-layout"><section class="play-area"><div class="canvas-card"><div class="canvas-wrap"><canvas id="canvas"></canvas><div id="submittedBadge" class="submitted-badge hidden">✓ Drawing submitted</div></div><div id="wordChoices" class="word-choices hidden"></div><div class="toolbar"><div class="tool-group"><span class="tool-label">TOOLS</span><button class="tool active" data-tool="pen">✎ <span>Pen</span></button><button class="tool" data-tool="eraser">⌫ <span>Eraser</span></button><button class="tool" data-tool="line">╱ <span>Line</span></button><button class="tool" data-tool="rect">□ <span>Box</span></button><button class="tool" data-tool="circle">○ <span>Circle</span></button><button class="tool" data-tool="triangle">△ <span>Triangle</span></button><button class="tool" data-tool="diamond">◇ <span>Diamond</span></button><button class="tool" data-tool="star">★ <span>Star</span></button><button class="tool" data-tool="arrow">➜ <span>Arrow</span></button><button class="tool" data-tool="fill">🪣 <span>Fill</span></button></div><div class="color-tools"><button class="swatch active" data-color="#151923" style="--sw:#151923" title="Black"></button><button class="swatch" data-color="#6b7280" style="--sw:#6b7280" title="Gray"></button><button class="swatch" data-color="#ffffff" style="--sw:#ffffff" title="White"></button><button class="swatch" data-color="#ef4444" style="--sw:#ef4444" title="Red"></button><button class="swatch" data-color="#f97316" style="--sw:#f97316" title="Orange"></button><button class="swatch" data-color="#facc15" style="--sw:#facc15" title="Yellow"></button><button class="swatch" data-color="#22c55e" style="--sw:#22c55e" title="Green"></button><button class="swatch" data-color="#14b8a6" style="--sw:#14b8a6" title="Teal"></button><button class="swatch" data-color="#06b6d4" style="--sw:#06b6d4" title="Cyan"></button><button class="swatch" data-color="#3b82f6" style="--sw:#3b82f6" title="Blue"></button><button class="swatch" data-color="#6366f1" style="--sw:#6366f1" title="Indigo"></button><button class="swatch" data-color="#a855f7" style="--sw:#a855f7" title="Purple"></button><button class="swatch" data-color="#ec4899" style="--sw:#ec4899" title="Pink"></button><button class="swatch" data-color="#92400e" style="--sw:#92400e" title="Brown"></button><button class="swatch" data-color="#f9a8d4" style="--sw:#f9a8d4" title="Light pink"></button></div><div class="brush"><span>SIZE</span><input id="size" type="range" min="2" max="28" value="6"></div><label id="fillWrap" class="fill-wrap hidden"><input id="fillShape" type="checkbox"> Fill</label><button class="tool clear" id="clearCanvas">Clear</button><button class="btn primary submit" id="submitDrawing">Submit drawing</button></div></div></section>
+<aside class="game-sidebar"><div class="panel players-panel"><div class="side-title"><div><small>LIVE SCOREBOARD</small><strong>Players</strong></div><span id="liveCount">0</span></div><div class="score-head"><span>PLAYER</span><span>SCORE</span></div><div id="sidePlayers" class="side-players"></div></div><div id="hostTools" class="panel host-tools hidden"><div class="host-tools-title">♛ Host challenge</div><label>Give a private instruction</label><select id="challengeTarget"></select><div class="challenge-row"><input id="challengeInput" maxlength="180" placeholder="e.g. only use 3 colors"><button id="sendChallenge">Send</button></div><small>Only that player sees it.</small></div><div class="panel chat-box"><div class="side-title"><div><small>LIVE CHAT</small><strong>Guess feed</strong></div><span>Race the clock</span></div><div id="messages" class="messages"></div><div class="chat-row"><input id="chatInput" maxlength="300" placeholder="Type a guess…"><button id="chatSend">↗</button></div></div></aside></div><div id="hostGameControls" class="host-bar hidden"><span>♛ HOST MODE</span><button class="btn ghost" id="endRound">End round & judge</button></div></section>
+<section id="voting" class="screen"><div class="center-head"><div class="eyebrow">ROUND COMPLETE</div><h1>Pick the highlights.</h1><p class="sub">Choose one drawing for each award. You can change your vote before the next round.</p></div><div class="vote-grid"><div class="award-card"><h3>🏆 <span>Best Drawing</span></h3><div id="bestGallery" class="gallery"></div></div><div class="award-card"><h3>💀 <span>Worst Drawing</span></h3><div id="worstGallery" class="gallery"></div></div><div class="award-card"><h3>😭 <span>Funniest Drawing</span></h3><div id="funGallery" class="gallery"></div></div></div><div class="vote-footer"><span id="voteStatus">0/3 awards selected</span><button id="nextRound" class="btn primary hidden">Next round →</button></div></section>
+<section id="finished" class="screen"><div class="panel final-panel"><div class="mini-icon">🏆</div><div class="eyebrow">GAME COMPLETE</div><h1>Artists, guessers & legends.</h1><div id="awardWinners"></div><div class="final-divider"></div><h3>Overall leaderboard</h3><div id="leaderboard"></div><button class="btn primary" id="homeBtn">Create another game</button></div></section>
 <div id="toast" class="toast"></div>
-</main>
-</div>
-<script src="/socket.io/socket.io.js"></script>
-<script src="/app.js"></script>
-</body>
-</html>
+</main></div><script src="/socket.io/socket.io.js"></script><script src="/app.js"></script></body></html>
