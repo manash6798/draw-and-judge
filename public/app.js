@@ -85,7 +85,7 @@ function renderChallengeTargets(){const s=$('challengeTarget');if(!s||!room)retu
 socket.on('room:update',r=>{const previous=lastStatus;room=r;lastStatus=r.status;
  if(r.status==='lobby'){show('lobby');$('roomCode').textContent=r.code;updatePlayers();if(isHost()){$('startEvent').classList.remove('hidden');$('hostNote').textContent="10 rounds • 80 seconds • 2 hints. Start when ready."}else{$('startEvent').classList.add('hidden');$('hostNote').textContent='Waiting for the host to start…'}}
  else if(r.status==='drawing'){votingDrawings={};show('game');updatePlayers();renderRound();$('hostGameControls').classList.toggle('hidden',!isHost());$('hostTools').classList.toggle('hidden',!isHost());}
- else if(r.status==='voting'){if(previous==='drawing'&&r.drawerId===socket.id&&lastSubmittedRound!==r.roundIndex)submitDrawing();show('voting');renderVoting();$('nextRound').classList.toggle('hidden',!isHost());}
+ else if(r.status==='voting'){if(previous==='drawing'&&r.drawerId===socket.id&&lastSubmittedRound!==r.roundIndex)submitDrawing();show('voting');renderVoting();$('nextRound').classList.toggle('hidden',!isHost());$('nextRound').disabled=!r.votingComplete;}
  else if(r.status==='finished'){show('finished');renderFinal()}
 });
 
@@ -160,8 +160,10 @@ socket.on('guess:correct',m=>{sound('correct');confetti(16);systemMessage(`🎯 
 socket.on('drawing:submitted',m=>{votingDrawings[m.userId]=m.image;if(room?.status==='voting')renderVoting()});
 function renderVoting(){clearInterval(timer);selected={best:room.votes?.best?.[socket.id]||null,worst:room.votes?.worst?.[socket.id]||null,funniest:room.votes?.funniest?.[socket.id]||null};const cats=[['best','bestGallery'],['worst','worstGallery'],['funniest','funGallery']];cats.forEach(([cat,id])=>{const el=$(id);el.innerHTML='';Object.entries(votingDrawings).forEach(([uid,img])=>{const u=room.users.find(x=>x.id===uid);if(!u)return;const d=document.createElement('button');d.type='button';d.className='drawing-card';d.innerHTML=`<img src="${img}" alt="Drawing by ${esc(u.name)}"><span class="draw-name">${esc(u.avatar)} ${esc(u.name)}</span><span class="vote-button">${uid===socket.id?'Your drawing':'Vote'}</span>`;if(uid===socket.id){d.disabled=true;d.classList.add('self')}else d.onclick=()=>{selected[cat]=uid;sound('vote');socket.emit('vote',{category:cat,targetId:uid});updateVoteStatus();renderVotingSelection()};if(selected[cat]===uid)d.classList.add('selected');el.appendChild(d)})});updateVoteStatus()}
 function renderVotingSelection(){renderVoting();}
-function updateVoteStatus(){const n=Object.values(selected).filter(Boolean).length;$('voteStatus').textContent=`${n}/3 awards selected`}
-socket.on('vote:accepted',m=>toast(`${m.category==='best'?'Best':m.category==='worst'?'Worst':'Funniest'} vote recorded ✓`));
+function updateVoteStatus(){const n=Object.values(selected).filter(Boolean).length;const done=!!room?.votingComplete;$('voteStatus').textContent=done?'All players have voted ✓':`${n}/3 awards selected • waiting for everyone to finish`;const next=$('nextRound');if(next){next.disabled=!done||!isHost();next.title=done?'Ready for the next round':'Waiting for all players to finish voting';}}
+socket.on('vote:accepted',m=>{sound('vote');toast(`${m.category==='best'?'Best':m.category==='worst'?'Worst':'Funniest'} vote recorded ✓`);if(room)room.votingComplete=!!m.complete;updateVoteStatus()});
+socket.on('vote:error',m=>{toast(m?.error||'Finish all votes before continuing.');sound('error');updateVoteStatus()});
+socket.on('host:transferred',m=>{toast(`👑 ${m.avatar||''} ${m.name} is now the host`);sound('join');if(room){room.hostId=m.hostId;updatePlayers();if(room.status==='lobby'){$('startEvent').classList.toggle('hidden',!isHost());$('hostNote').textContent=isHost()?'You are the new host — start when ready.':'Waiting for the host to start…'}}});
 
 socket.on('chat',addMessage);socket.on('chat:history',msgs=>{$('messages').innerHTML='';msgs.forEach(addMessage)});
 function addMessage(m){const d=document.createElement('div');d.className='msg'+(m.guess?' guess-msg':'');d.innerHTML=`<b>${esc(m.avatar)} ${esc(m.name)}</b><span>${esc(m.text)}</span>`;$('messages').appendChild(d);$('messages').scrollTop=$('messages').scrollHeight}
